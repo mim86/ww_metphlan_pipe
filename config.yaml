@@ -1,0 +1,59 @@
+# Which run folder under raw_data/ to use
+current_run: "RUN1"
+
+threads:
+  fastqc: 4
+  fastp: 8
+  hocort: 8
+  metaphlan: 8
+  multiqc: 2
+
+# HoCoRT / Bowtie2 host index prefix (e.g. human_genome/hg38.*)
+host_index_prefix: "human_genome/hg38"
+
+# fastp for adapter-only trimming (trim_adapters rule)
+fastp_adapter:
+  # booleans: yes/no, true/false, or leave empty for "off"
+  detect_adapter_for_pe: yes
+  disable_quality_filtering: yes
+  disable_length_filtering: yes
+
+  # any extra fastp arguments you want to pass (string, optional)
+  extra_args:
+
+# fastp for quality trimming (trim_clean rule)
+fastp_clean:
+  # booleans: yes/no, true/false, or leave empty for "off"
+  detect_adapter_for_pe: yes
+  cut_front: yes
+  cut_tail: yes
+
+  # numeric options (leave empty to use fastp defaults)
+  cut_tail_mean_quality: 20
+  length_required: 60
+
+  # any extra fastp arguments you want to pass (string, optional)
+  extra_args:
+
+metaphlan:
+  # Database location and index name (inside container)
+  db_dir: "/work/metaphlan_db"
+  index: "mpa_vJan25_CHOCOPhlAnSGB_202503"
+
+  # What to report
+  tax_lev: "a"             # "a" = all levels, "s" = species, etc.
+  analysis_type: "rel_ab"  # rel_ab, rel_ab_w_read_stats, marker_ab_table, etc.
+
+  # OPTIONAL cutoffs. If left empty, MetaPhlAn's own default is used.
+  read_min_len:
+  min_mapq_val:
+  stat_q:
+  perc_nonzero:
+
+  # Optional flags / behaviour
+  skip_unclassified_estimation:
+  subsampling_paired:
+  subsampling_seed:
+
+  # Extra free-text arguments (optional)
+  extra_args:

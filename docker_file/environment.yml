@@ -1,0 +1,38 @@
+# environment.yml
+name: wastewater
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - python=3.9
+
+  # Workflow manager
+  - snakemake
+
+  # Host decontamination
+  - hocort        # pulls bowtie2/minimap2/samtools etc. as deps
+
+  # Taxonomic profiling
+  - metaphlan
+
+  # QC / trimming
+  - fastp
+  - cutadapt
+  - fastqc
+  - multiqc
+
+  # Mapping tools (some may be redundant but that's fine)
+  - bowtie2
+  - bwa-mem2
+  - minimap2
+  - hisat2
+ 
+
+  # Useful CLI tools
+  - samtools
+  - pigz
+  - gzip
+  - wget
+  - coreutils
