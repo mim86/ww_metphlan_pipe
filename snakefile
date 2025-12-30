@@ -1,4 +1,5 @@
 import os
+import glob
 from snakemake.io import glob_wildcards
 
 # -----------------------------
@@ -24,6 +25,29 @@ HOST_INDEX_PREFIX = config["host_index_prefix"]
 fastp_adapter_cfg = config.get("fastp_adapter", {})
 fastp_clean_cfg   = config.get("fastp_clean", {})
 metaphlan_cfg     = config.get("metaphlan", {})
+
+# -----------------------------
+# NEW: Accept multiple FASTQ extensions in raw_data
+# -----------------------------
+RAW_EXTS = ["fastq.gz", "fastq", "fq.gz", "fq"]
+
+def get_raw_fastq(sample, read):
+    """
+    Return the existing raw FASTQ path for a given sample/read across:
+    .fastq, .fastq.gz, .fq, .fq.gz
+
+    Expected naming stays the same:
+      {sample}_R1.<ext>
+      {sample}_R2.<ext>
+    """
+    for ext in RAW_EXTS:
+        p = f"raw_data/{RUN}/{sample}_R{read}.{ext}"
+        if os.path.exists(p):
+            return p
+    raise FileNotFoundError(
+        f"No raw FASTQ found for sample={sample} read=R{read} with extensions {RAW_EXTS} "
+        f"in raw_data/{RUN}/"
+    )
 
 def _truthy(val):
     """
@@ -145,9 +169,13 @@ def count_fastq_reads(path):
     return n_lines // 4
 
 # -----------------------------
-# Detect samples from raw R1 files
+# Detect samples from raw R1 files (NOW supports fastq/fastq.gz/fq/fq.gz)
 # -----------------------------
-SAMPLES, = glob_wildcards(f"raw_data/{RUN}/{{sample}}_R1.fastq.gz")
+r1_files = []
+for ext in RAW_EXTS:
+    r1_files.extend(glob.glob(f"raw_data/{RUN}/*_R1.{ext}"))
+
+SAMPLES = sorted({os.path.basename(p).split("_R1.")[0] for p in r1_files})
 
 # -----------------------------
 # Final targets
@@ -170,8 +198,8 @@ rule fastqc_raw:
     FastQC on raw reads (before any trimming).
     """
     input:
-        r1 = f"raw_data/{RUN}/{{sample}}_R1.fastq.gz",
-        r2 = f"raw_data/{RUN}/{{sample}}_R2.fastq.gz"
+        r1 = lambda wc: get_raw_fastq(wc.sample, 1),
+        r2 = lambda wc: get_raw_fastq(wc.sample, 2)
     output:
         html_r1 = f"{results_dir}/qc_raw/{{sample}}_R1_fastqc.html",
         html_r2 = f"{results_dir}/qc_raw/{{sample}}_R2_fastqc.html"
@@ -210,11 +238,11 @@ rule trim_adapters:
     Adapter-only trimming with fastp (no quality / length filtering).
     """
     input:
-        r1 = f"raw_data/{RUN}/{{sample}}_R1.fastq.gz",
-        r2 = f"raw_data/{RUN}/{{sample}}_R2.fastq.gz"
+        r1 = lambda wc: get_raw_fastq(wc.sample, 1),
+        r2 = lambda wc: get_raw_fastq(wc.sample, 2)
     output:
-        r1  = f"{results_dir}/trim_adapter/{{sample}}_R1.trimA.fastq.gz",
-        r2  = f"{results_dir}/trim_adapter/{{sample}}_R2.trimA.fastq.gz",
+        r1   = f"{results_dir}/trim_adapter/{{sample}}_R1.trimA.fastq.gz",
+        r2   = f"{results_dir}/trim_adapter/{{sample}}_R2.trimA.fastq.gz",
         html = f"{results_dir}/trim_adapter/{{sample}}.trimA.fastp.html",
         json = f"{results_dir}/trim_adapter/{{sample}}.trimA.fastp.json"
     threads: T_FASTP
@@ -277,8 +305,8 @@ rule trim_clean:
         r1 = f"{results_dir}/host_removed/{{sample}}_R1.nohost.fastq.gz",
         r2 = f"{results_dir}/host_removed/{{sample}}_R2.nohost.fastq.gz"
     output:
-        r1  = f"{results_dir}/trim_clean/{{sample}}_R1.clean.fastq.gz",
-        r2  = f"{results_dir}/trim_clean/{{sample}}_R2.clean.fastq.gz",
+        r1   = f"{results_dir}/trim_clean/{{sample}}_R1.clean.fastq.gz",
+        r2   = f"{results_dir}/trim_clean/{{sample}}_R2.clean.fastq.gz",
         html = f"{results_dir}/trim_clean/{{sample}}.clean.fastp.html",
         json = f"{results_dir}/trim_clean/{{sample}}.clean.fastp.json"
     threads: T_FASTP
@@ -428,3 +456,4 @@ rule metaphlan_merge:
         mkdir -p {results_dir}/metaphlan
         merge_metaphlan_tables.py {input} > {output}
         """
+
