@@ -268,26 +268,32 @@ rule trim_adapters:
 # =============================
 
 rule hocort_host_removal:
-    """
-    Remove host reads using HoCoRT + Bowtie2, keeping unmapped (non-host) reads.
-    """
     input:
         r1 = f"{results_dir}/trim_adapter/{{sample}}_R1.trimA.fastq.gz",
         r2 = f"{results_dir}/trim_adapter/{{sample}}_R2.trimA.fastq.gz"
     output:
         r1 = f"{results_dir}/host_removed/{{sample}}_R1.nohost.fastq.gz",
         r2 = f"{results_dir}/host_removed/{{sample}}_R2.nohost.fastq.gz"
+    threads:
+        T_HOCORT
     params:
-        index = HOST_INDEX_PREFIX
-    threads: T_HOCORT
+        idx = HOST_INDEX_PREFIX,
+        outprefix = f"{results_dir}/host_removed/{{sample}}"
     shell:
         r"""
+        set -euo pipefail
         mkdir -p {results_dir}/host_removed
-        hocort map bowtie2 \
-          -x {params.index} \
-          -i {input.r1} {input.r2} \
-          -o {output.r1} {output.r2} \
-          --filter true
+
+        bowtie2 -p {threads} -x {params.idx} \
+          -1 {input.r1} -2 {input.r2} \
+          --very-fast-local \
+          --un-conc-gz {params.outprefix}.nohost.fastq.gz \
+          -S /dev/null
+
+        test -s {params.outprefix}.nohost.fastq.1.gz
+        test -s {params.outprefix}.nohost.fastq.2.gz
+        mv {params.outprefix}.nohost.fastq.1.gz {output.r1}
+        mv {params.outprefix}.nohost.fastq.2.gz {output.r2}
         """
 
 
@@ -456,4 +462,3 @@ rule metaphlan_merge:
         mkdir -p {results_dir}/metaphlan
         merge_metaphlan_tables.py {input} > {output}
         """
-
